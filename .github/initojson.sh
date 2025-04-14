@@ -1,58 +1,79 @@
 awk '
 BEGIN {
-  printf "{"
-  section_count = 0
-  first_section = 1
+    g_keys_i = 0
+    section = ""; count = 0; n_sections = 0
+    print "{"
 }
-/^\s*\[.*\]\s*$/ {
-  if (!first_section) {
-    printf "},"
-  }
-  section_name = $0
-  gsub(/^\s*\[|\]\s*$/, "", section_name)
-  section_names[section_count++] = section_name
-  printf "\"%s\":{", section_name
-  key_count = 0
-  first_section = 0
-  next
+
+# Skip empty lines or comment lines (semicolon)
+/^[[:space:]]*$/ || /^[[:space:]]*;/ {
+    next
 }
-/^[^#;].*=.*$/ {
-  split($0, kv, "=")
-  key = kv[1]
-  value = substr($0, index($0, "=") + 1)
 
-  # Trim whitespace
-  gsub(/^[ \t]+|[ \t]+$/, "", key)
-  gsub(/^[ \t]+|[ \t]+$/, "", value)
-
-  # Remove outer quotes if any
-  if ((value ~ /^".*"$/) || (value ~ /^'\''.*'\''$/)) {
-    value = substr(value, 2, length(value)-2)
-  }
-
-  # Escape double quotes
-  gsub(/"/, "\\\"", value)
-
-  if (key_count++ > 0) {
-    printf ","
-  }
-  printf "\"%s\":\"%s\"", key, value
-  next
+# Match section headers like [section.name]
+/^\[[^]]+\]$/ {
+    section = substr($0, 2, length($0) - 2)
+    n_sections++
+    next
 }
-END {
-  if (section_count > 0) {
-    printf "},"
-  }
 
-  # Add mat_idxs array starting from 0
-  max_idx = int(section_count / 2)
-  printf "\"mat_idxs\":["
-  for (i = 0; i < max_idx; i++) {
-    printf i
-    if (i < max_idx - 1) {
-      printf ","
+# Match key = value (optionally quoted)
+$0 ~ /^[[:space:]]*[^#;][^=]*=[^=]*$/ {
+    line = $0
+    sub(/^[[:space:]]+/, "", line)
+    sub(/[[:space:]]+$/, "", line)
+
+    split(line, kv, "=")
+    key = kv[1]
+    value = kv[2]
+
+    sub(/[[:space:]]+$/, "", key)
+    sub(/^[[:space:]]+/, "", value)
+
+    if (value ~ /^"(.*)"$/) {
+        value = substr(value, 2, length(value) - 2)
     }
-  }
-  printf "]}"
+
+    if (section == "") {
+        g_keys[key] = value
+        g_keys_order[g_keys_i++] = key
+    } else {
+        data[section "." key] = value
+        section_keys[section] = section_keys[section] ? section_keys[section] "," key : key
+    }
+}
+
+END {
+    # Print global keys as "global": { ... }
+    printf "\"global\":{"
+    for (i = 0; i < length(g_keys_order); i++) {
+        k = g_keys_order[i]
+        printf "\"%s\":\"%s\"", k, g_keys[k]
+        if (i < length(g_keys_order) - 1) printf ","
+    }
+    printf "}"
+
+    # Print sections and their keys
+    idx = 0
+    for (s in section_keys) {
+        printf ",\"preset.%d\":{", idx
+        split(section_keys[s], keys, ",")
+        for (i = 1; i <= length(keys); i++) {
+            k = keys[i]
+            printf "\"%s\":\"%s\"", k, data[s "." k]
+            if (i < length(keys)) printf ","
+        }
+        printf "}"
+        idx++
+    }
+
+    # Generate mat_idxs array: from 0 to floor(n_sections / 2) - 1
+    half = int(n_sections / 2)
+    printf ",\"mat_idxs\":["
+    for (i = 0; i < half; i++) {
+        printf "%d", i
+        if (i < half - 1) printf ","
+    }
+    print "]}"
 }
 '
