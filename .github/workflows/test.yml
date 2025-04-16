@@ -13,31 +13,30 @@ jobs:
         run: chmod +x ./.github/initojson.sh       
       - name: Pass Project 
         id: pass-project
-        run: echo "project=$(cat project.godot | ./.github/initojson.sh | jq 'tojson')" >> GITHUB_OUTPUT               
+        run: echo "project=$(cat project.godot | ./.github/initojson.sh | tr -d '\t' | jq -r 'tojson')" >> $GITHUB_OUTPUT               
       - name: Pass Exports  
         id: pass-exports
-        run: echo "export=$(cat export_presets.cfg | ./.github/initojson.sh | jq 'tojson')" >> GITHUB_OUTPUT
+        run: echo "export=$(cat export_presets.cfg | ./.github/initojson.sh | tr -d '\t' | jq -r 'tojson')" >> $GITHUB_OUTPUT
       - name: Pass Indexes  
         id: pass-idxs
-        run: echo "export_idxs=$(cat export_presets.cfg | ./.github/initojson.sh | jq '.mat_idxs | tojson')" >> GITHUB_OUTPUT
+        run: echo "mat_idxs=$(cat export_presets.cfg | ./.github/initojson.sh | tr -d '\t' | jq -r '.mat_idxs | tojson')" >> $GITHUB_OUTPUT
     outputs: 
       project: ${{ steps.pass-project.outputs.project }}
       export: ${{ steps.pass-exports.outputs.export }}
-      export_idxs: ${{ steps.pass-idxs.outputs.export_idxs }}
+      mat_idxs: ${{ steps.pass-idxs.outputs.mat_idxs }}
   test2:
     needs: test1
     name: Test 2
     runs-on: ubuntu-latest
-#    env:
-#      project: ${{ fromJSON(needs.test-1.outputs.project) }}
-#      export: ${{ fromJSON(needs.test-1.outputs.export) }}
-#    strategy:
-#      matrix: 
-#        idx: ${{ fromJSON(needs.test-1.outputs.export_idxs) }}
+    strategy:
+      matrix: ${{ fromJson(needs.test1.outputs.mat_idxs) }}
     steps:
       - run: |
-          echo "${{toJSON(needs.test1.outputs)}}" 
-#          echo "idx: ${{ needs.test1.outputs.export_idxs }}"
-#          echo "export: ${{ needs.test1.outputs.export }}"
-#          echo "project: ${{ needs.test1.outputs.project }}"
+          echo "idx: ${{ matrix.mat_idxs }}"
+          echo "---------------------------"
+          mypreset=
+          echo "${{ fromJson(needs.test1.outputs.export)[format('preset.{0}', matrix.mat_idxs)].platform }}"
+#          echo "idx: ${{ fromJSON(needs.test1.outputs.export_idxs) }}"
+#          echo "export: ${{ fromJSON(needs.test1.outputs.export) }}"
+#          echo "project: ${{ fromJSON(needs.test1.outputs.project) }}"
 #          echo "--------------------"

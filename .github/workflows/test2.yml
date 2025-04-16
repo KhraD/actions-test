@@ -1,0 +1,28 @@
+name: "Test"
+on: 
+  workflow_dispatch:
+jobs:
+  test1:
+    name: Test 1
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Pass Indexes
+        id: pass-idxs
+        run: |
+          echo "mat_idxs={\"mat_idxs\":[0,1,2,3,4]}"
+          echo "mat_idxs={\"mat_idxs\":[0,1,2,3,4]}" >> $GITHUB_OUTPUT
+    outputs: 
+      project: ${{ steps.pass-project.outputs.project }}
+      export: ${{ steps.pass-exports.outputs.export }}
+      mat_idxs: ${{ steps.pass-idxs.outputs.mat_idxs }}
+  test2:
+    needs: test1
+    name: Test 2
+    runs-on: ubuntu-latest
+    strategy:
+      matrix: ${{ fromJson(needs.test1.outputs.mat_idxs) }}
+    steps:
+      - run: |
+          echo "mat_idxs: ${{ matrix.mat_idxs }}"
